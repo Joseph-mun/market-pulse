@@ -23,7 +23,7 @@ async function fetchYahooIndex(symbol: string): Promise<YahooChartResult | null>
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
     const res = await fetch(url, {
-      next: { revalidate: 1800 },
+      cache: 'no-store',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
       },

@@ -10,7 +10,7 @@ export async function fetchFredSeries(
   const startDate = opts?.startDate ?? '2019-01-01';
   const url = `${FRED_BASE}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&observation_start=${startDate}&sort_order=desc&limit=${opts?.limit ?? 100}`;
 
-  const res = await fetch(url, { next: { revalidate: 1800 } });
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) {
     console.error(`FRED API error for ${seriesId}: ${res.status}`);
     return [];
