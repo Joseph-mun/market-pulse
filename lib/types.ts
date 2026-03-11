@@ -89,6 +89,7 @@ export interface IndustryImpact {
   whenUp: string;
   whenDown: string;
   category: IndicatorCategory;
+  upIsGood: boolean; // true = 상승 시 해당 섹터에 긍정, false = 상승 시 부정
 }
 
 export interface Industry {
@@ -129,6 +130,7 @@ export interface IndicatorRow {
   industryRelevance?: Relevance;
   whenUp?: string;
   whenDown?: string;
+  upIsGood?: boolean;
 }
 
 // --- API Response Types ---

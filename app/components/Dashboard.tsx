@@ -61,6 +61,7 @@ export default function Dashboard({
           industryRelevance: impact?.relevance,
           whenUp: impact?.whenUp,
           whenDown: impact?.whenDown,
+          upIsGood: impact?.upIsGood,
         };
       });
   }, [indicators, selectedIndustry]);

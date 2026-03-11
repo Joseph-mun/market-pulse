@@ -47,18 +47,32 @@ function getFallbackData() {
   };
 }
 
+// Downsample large observation arrays for chart display (keeps payload manageable)
+function downsample(obs: FredObservation[], maxPoints: number): FredObservation[] {
+  if (obs.length <= maxPoints) return obs;
+  const step = (obs.length - 1) / (maxPoints - 1);
+  const result: FredObservation[] = [];
+  for (let i = 0; i < maxPoints - 1; i++) {
+    result.push(obs[Math.round(i * step)]);
+  }
+  result.push(obs[obs.length - 1]); // always include latest
+  return result;
+}
+
 async function fetchAllFredData(apiKey: string) {
   const uniqueIds = [...new Set(ALL_INDICATORS.map(i => i.id))];
   const allObservations = new Map<string, FredObservation[]>();
   const indicators: IndicatorRow[] = [];
 
-  // Fetch in batches
+  // Fetch in batches — daily indicators need more data for 7Y charts
   const batchSize = 8;
   for (let i = 0; i < uniqueIds.length; i += batchSize) {
     const batch = uniqueIds.slice(i, i + batchSize);
     const results = await Promise.allSettled(
       batch.map(async (id) => {
-        const obs = await fetchFredSeries(id, apiKey, { limit: 120 });
+        const freq = getUpdateFrequency(id);
+        const limit = freq === 'daily' ? 2000 : 120;
+        const obs = await fetchFredSeries(id, apiKey, { limit });
         return { id, obs };
       })
     );
@@ -99,7 +113,7 @@ async function fetchAllFredData(apiKey: string) {
       interpretation: meta.interpretation,
       krInvestmentLink: meta.krCompanyLink,
       updateFrequency: getUpdateFrequency(meta.id),
-      observations: obs.map(o => ({ date: o.date, value: o.value })),
+      observations: downsample(obs, 400).map(o => ({ date: o.date, value: o.value })),
     });
   }
 

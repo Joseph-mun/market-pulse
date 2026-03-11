@@ -48,6 +48,24 @@ function ChangeTag({ value, unit }: { value: number | null; unit: string }) {
   return <span className={`text-[9px] tabular-nums ${color}`}>{prefix}{value.toFixed(1)}{suffix}</span>;
 }
 
+function SentimentTag({ upIsGood, yoy }: { upIsGood: boolean; yoy: number | null }) {
+  // Determine current sentiment: is the current trend good or bad for the sector?
+  const trending = yoy !== null ? yoy > 0 : null;
+  const isFavorable = trending !== null ? (upIsGood ? trending : !trending) : null;
+
+  if (isFavorable === null) return null;
+
+  return (
+    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium border ${
+      isFavorable
+        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+        : 'bg-red-500/15 text-red-400 border-red-500/30'
+    }`}>
+      {isFavorable ? '▲ 긍정' : '▼ 부정'}
+    </span>
+  );
+}
+
 export default function IndicatorChartCard({ indicator, chartRange, isSelected, onClick }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -166,8 +184,16 @@ export default function IndicatorChartCard({ indicator, chartRange, isSelected, 
           <div className="flex items-center gap-1.5">
             <SignalDot signal={indicator.signal} />
             <span className="text-[11px] font-medium text-[var(--text-primary)] truncate">{indicator.nameKr}</span>
+            {indicator.upIsGood !== undefined && (
+              <SentimentTag upIsGood={indicator.upIsGood} yoy={indicator.yoy} />
+            )}
           </div>
           <div className="text-[9px] text-[var(--text-muted)] mt-0.5 truncate">{indicator.id}</div>
+          {indicator.upIsGood !== undefined && (
+            <div className="text-[9px] text-[var(--text-secondary)] mt-0.5 truncate">
+              {(indicator.yoy ?? 0) >= 0 ? indicator.whenUp : indicator.whenDown}
+            </div>
+          )}
         </div>
         <div className="text-right flex-shrink-0 ml-2">
           <div className="text-xs font-semibold tabular-nums">{formatValue(indicator.latestValue)}</div>
