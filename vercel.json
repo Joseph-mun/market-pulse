@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "app/api/fred/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/exchange/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/indices/route.ts": {
+      "maxDuration": 30
+    },
+    "app/page.tsx": {
+      "maxDuration": 120
+    }
+  }
+}
