@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import type { IndicatorRow, ExchangeRate, MarketIndex, LiquidityScore } from '@/lib/types';
+import { useState, useCallback, useMemo } from 'react';
+import type { IndicatorRow, ExchangeRate, MarketIndex, LiquidityScore, ChartRange, UpdateFrequency } from '@/lib/types';
 import { INDUSTRIES } from '@/data/industry-map';
+import { FREQUENCY_LABELS } from '@/data/indicator-meta';
 import MarketTicker from './MarketTicker';
 import IndustryFilter from './IndustryFilter';
 import LiquidityScorePanel from './LiquidityScorePanel';
-import IndicatorTable from './IndicatorTable';
 import ImpactAnalysis from './ImpactAnalysis';
 import DetailPanel from './DetailPanel';
+import TimeRangeControl from './TimeRangeControl';
+import IndicatorChartCard from './IndicatorChartCard';
 
 interface Props {
   indicators: IndicatorRow[];
@@ -17,6 +19,8 @@ interface Props {
   liquidityScore: LiquidityScore;
   lastUpdated: string;
 }
+
+const FREQUENCY_ORDER: UpdateFrequency[] = ['daily', 'monthly', 'quarterly'];
 
 export default function Dashboard({
   indicators,
@@ -27,6 +31,7 @@ export default function Dashboard({
 }: Props) {
   const [selectedIndustryId, setSelectedIndustryId] = useState<string | null>(null);
   const [selectedIndicator, setSelectedIndicator] = useState<IndicatorRow | null>(null);
+  const [chartRange, setChartRange] = useState<ChartRange>('3Y');
 
   const selectedIndustry = selectedIndustryId
     ? INDUSTRIES.find(i => i.id === selectedIndustryId) ?? null
@@ -40,6 +45,44 @@ export default function Dashboard({
   const handleIndicatorSelect = useCallback((indicator: IndicatorRow) => {
     setSelectedIndicator(prev => prev?.id === indicator.id ? null : indicator);
   }, []);
+
+  // Filter indicators based on selected industry
+  const filteredIndicators = useMemo(() => {
+    if (!selectedIndustry) return indicators;
+
+    // When industry is selected: only show industry-related indicators, exclude Liquidity/macro
+    const impactIds = new Set(selectedIndustry.impacts.map(imp => imp.indicatorId));
+    return indicators
+      .filter(ind => impactIds.has(ind.id))
+      .map(ind => {
+        const impact = selectedIndustry.impacts.find(imp => imp.indicatorId === ind.id);
+        return {
+          ...ind,
+          industryRelevance: impact?.relevance,
+          whenUp: impact?.whenUp,
+          whenDown: impact?.whenDown,
+        };
+      });
+  }, [indicators, selectedIndustry]);
+
+  // Group by update frequency
+  const groupedByFrequency = useMemo(() => {
+    const groups = new Map<UpdateFrequency, IndicatorRow[]>();
+    for (const freq of FREQUENCY_ORDER) {
+      groups.set(freq, []);
+    }
+    for (const ind of filteredIndicators) {
+      const freq = ind.updateFrequency ?? 'monthly';
+      const list = groups.get(freq);
+      if (list) list.push(ind);
+      else groups.set(freq, [ind]);
+    }
+    // Remove empty groups
+    for (const [key, val] of groups) {
+      if (val.length === 0) groups.delete(key);
+    }
+    return groups;
+  }, [filteredIndicators]);
 
   // Summary stats
   const ppiCount = indicators.filter(i => i.category === 'PPI').length;
@@ -64,66 +107,63 @@ export default function Dashboard({
 
       {/* Main Content */}
       <div className="flex-1 p-4 max-w-[1600px] mx-auto w-full">
-        {/* Top row: Score + Summary */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-          {/* Liquidity Score */}
-          <LiquidityScorePanel score={liquidityScore} />
+        {/* Top row: Score + Summary — only in "전체" view */}
+        {!selectedIndustry && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            <LiquidityScorePanel score={liquidityScore} />
 
-          {/* Market Summary */}
-          <div className="lg:col-span-2 bg-[var(--bg-card)] rounded-lg border border-[var(--border)] p-4">
-            <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
-              Market Summary
-            </h3>
+            <div className="lg:col-span-2 bg-[var(--bg-card)] rounded-lg border border-[var(--border)] p-4">
+              <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+                Market Summary
+              </h3>
 
-            {/* Quick stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <div className="bg-[var(--bg-primary)] rounded px-3 py-2">
-                <div className="text-[10px] text-[var(--text-muted)] uppercase">PPI 시리즈</div>
-                <div className="text-lg font-bold">{ppiCount}</div>
-              </div>
-              <div className="bg-[var(--bg-primary)] rounded px-3 py-2">
-                <div className="text-[10px] text-[var(--text-muted)] uppercase">유동성 지표</div>
-                <div className="text-lg font-bold">{liqCount}</div>
-              </div>
-              <div className="bg-[var(--bg-primary)] rounded px-3 py-2">
-                <div className="text-[10px] text-[var(--text-muted)] uppercase">Strong Uptrend</div>
-                <div className="text-lg font-bold text-[var(--accent-red)]">{strongUp}</div>
-              </div>
-              <div className="bg-[var(--bg-primary)] rounded px-3 py-2">
-                <div className="text-[10px] text-[var(--text-muted)] uppercase">Deep Decline</div>
-                <div className="text-lg font-bold text-[var(--accent-blue)]">{deepDown}</div>
-              </div>
-            </div>
-
-            {/* Signal pills for indices */}
-            <div className="flex flex-wrap gap-2 mb-3">
-              {marketIndices.map(idx => (
-                <div key={idx.symbol} className="flex items-center gap-1.5 bg-[var(--bg-primary)] rounded px-2.5 py-1.5">
-                  <span className="text-xs text-[var(--text-secondary)]">{idx.nameKr}</span>
-                  <span className="text-xs font-semibold tabular-nums">{idx.price.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
-                  <span className={`text-[10px] tabular-nums ${idx.changePercent >= 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`}>
-                    {idx.changePercent >= 0 ? '+' : ''}{idx.changePercent.toFixed(2)}%
-                  </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                <div className="bg-[var(--bg-primary)] rounded px-3 py-2">
+                  <div className="text-[10px] text-[var(--text-muted)] uppercase">PPI 시리즈</div>
+                  <div className="text-lg font-bold">{ppiCount}</div>
                 </div>
-              ))}
-            </div>
+                <div className="bg-[var(--bg-primary)] rounded px-3 py-2">
+                  <div className="text-[10px] text-[var(--text-muted)] uppercase">유동성 지표</div>
+                  <div className="text-lg font-bold">{liqCount}</div>
+                </div>
+                <div className="bg-[var(--bg-primary)] rounded px-3 py-2">
+                  <div className="text-[10px] text-[var(--text-muted)] uppercase">Strong Uptrend</div>
+                  <div className="text-lg font-bold text-[var(--accent-red)]">{strongUp}</div>
+                </div>
+                <div className="bg-[var(--bg-primary)] rounded px-3 py-2">
+                  <div className="text-[10px] text-[var(--text-muted)] uppercase">Deep Decline</div>
+                  <div className="text-lg font-bold text-[var(--accent-blue)]">{deepDown}</div>
+                </div>
+              </div>
 
-            {/* Exchange rate pills */}
-            <div className="flex flex-wrap gap-2">
-              {exchangeRates.map(rate => (
-                <div key={rate.pair} className="flex items-center gap-1.5 bg-[var(--bg-primary)] rounded px-2.5 py-1.5">
-                  <span className="text-xs text-[var(--text-secondary)]">{rate.pair}</span>
-                  <span className="text-xs font-semibold tabular-nums">{rate.rate.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
-                  {rate.change1d !== null && (
-                    <span className={`text-[10px] tabular-nums ${rate.change1d >= 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`}>
-                      {rate.change1d >= 0 ? '+' : ''}{rate.change1d.toFixed(2)}%
+              <div className="flex flex-wrap gap-2 mb-3">
+                {marketIndices.map(idx => (
+                  <div key={idx.symbol} className="flex items-center gap-1.5 bg-[var(--bg-primary)] rounded px-2.5 py-1.5">
+                    <span className="text-xs text-[var(--text-secondary)]">{idx.nameKr}</span>
+                    <span className="text-xs font-semibold tabular-nums">{idx.price.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                    <span className={`text-[10px] tabular-nums ${idx.changePercent >= 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`}>
+                      {idx.changePercent >= 0 ? '+' : ''}{idx.changePercent.toFixed(2)}%
                     </span>
-                  )}
-                </div>
-              ))}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {exchangeRates.map(rate => (
+                  <div key={rate.pair} className="flex items-center gap-1.5 bg-[var(--bg-primary)] rounded px-2.5 py-1.5">
+                    <span className="text-xs text-[var(--text-secondary)]">{rate.pair}</span>
+                    <span className="text-xs font-semibold tabular-nums">{rate.rate.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+                    {rate.change1d !== null && (
+                      <span className={`text-[10px] tabular-nums ${rate.change1d >= 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`}>
+                        {rate.change1d >= 0 ? '+' : ''}{rate.change1d.toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Industry Impact Analysis (only when industry is selected) */}
         {selectedIndustry && (
@@ -135,15 +175,52 @@ export default function Dashboard({
           </div>
         )}
 
-        {/* Main content: Table + Detail */}
+        {/* Chart Grid Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className={selectedIndicator ? 'lg:col-span-2' : 'lg:col-span-3'}>
-            <IndicatorTable
-              indicators={indicators}
-              selectedIndustry={selectedIndustry}
-              onSelect={handleIndicatorSelect}
-              selectedId={selectedIndicator?.id ?? null}
-            />
+            {/* Time Range Control Header */}
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                지표 차트
+                <span className="ml-2 text-[var(--text-muted)] normal-case">
+                  ({filteredIndicators.length}개{selectedIndustry ? ` · ${selectedIndustry.name}` : ''})
+                </span>
+              </h3>
+              <TimeRangeControl value={chartRange} onChange={setChartRange} />
+            </div>
+
+            {/* Grouped chart cards */}
+            {Array.from(groupedByFrequency.entries()).map(([freq, group]) => (
+              <div key={freq} className="mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-semibold text-[var(--accent-cyan)] uppercase tracking-wider">
+                    {FREQUENCY_LABELS[freq]}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)]">
+                    {group.length}개
+                  </span>
+                  <div className="flex-1 h-px bg-[var(--border)]" />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+                  {group.map(ind => (
+                    <IndicatorChartCard
+                      key={ind.id}
+                      indicator={ind}
+                      chartRange={chartRange}
+                      isSelected={selectedIndicator?.id === ind.id}
+                      onClick={() => handleIndicatorSelect(ind)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {filteredIndicators.length === 0 && (
+              <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border)] px-4 py-12 text-center text-xs text-[var(--text-muted)]">
+                해당하는 지표가 없습니다
+              </div>
+            )}
           </div>
 
           {/* Detail Panel */}

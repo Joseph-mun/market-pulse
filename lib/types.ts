@@ -9,6 +9,8 @@ export type LiquidityZone = 'EXPANSIONARY' | 'TRANSITIONAL' | 'RESTRICTIVE';
 export type IndicatorCategory = 'PPI' | 'Liquidity' | 'Exchange' | 'Index';
 export type Relevance = 'high' | 'medium';
 export type TimeFrame = 'mom' | '3m' | '6m' | 'yoy';
+export type UpdateFrequency = 'realtime' | 'daily' | 'monthly' | 'quarterly';
+export type ChartRange = '1Y' | '3Y' | '5Y' | '7Y';
 
 export interface FredObservation {
   date: string;
@@ -121,6 +123,8 @@ export interface IndicatorRow {
   description: string;
   interpretation: string;
   krInvestmentLink: string;
+  updateFrequency: UpdateFrequency;
+  observations: { date: string; value: number }[];
   // For industry filter
   industryRelevance?: Relevance;
   whenUp?: string;

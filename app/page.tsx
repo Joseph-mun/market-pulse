@@ -1,5 +1,5 @@
 import Dashboard from './components/Dashboard';
-import { ALL_INDICATORS } from '@/data/indicator-meta';
+import { ALL_INDICATORS, getUpdateFrequency } from '@/data/indicator-meta';
 import { fetchFredSeries, computeChanges, determineSignal } from '@/lib/fred';
 import { fetchExchangeRates } from '@/lib/exchange';
 import { fetchMarketIndices } from '@/lib/indices';
@@ -8,7 +8,6 @@ import type { IndicatorRow, FredObservation } from '@/lib/types';
 
 export const revalidate = 1800; // 30 min ISR
 
-// Fallback data for when APIs are unavailable (dev/build without API key)
 function getFallbackData() {
   const indicators: IndicatorRow[] = ALL_INDICATORS.map(meta => ({
     id: meta.id,
@@ -28,6 +27,8 @@ function getFallbackData() {
     description: meta.description,
     interpretation: meta.interpretation,
     krInvestmentLink: meta.krCompanyLink,
+    updateFrequency: getUpdateFrequency(meta.id),
+    observations: [],
   }));
 
   return {
@@ -70,7 +71,6 @@ async function fetchAllFredData(apiKey: string) {
 
   // Process into IndicatorRows
   for (const meta of ALL_INDICATORS) {
-    // Skip duplicates (keep first occurrence)
     if (indicators.some(ind => ind.id === meta.id)) continue;
 
     const obs = allObservations.get(meta.id);
@@ -98,6 +98,8 @@ async function fetchAllFredData(apiKey: string) {
       description: meta.description,
       interpretation: meta.interpretation,
       krInvestmentLink: meta.krCompanyLink,
+      updateFrequency: getUpdateFrequency(meta.id),
+      observations: obs.map(o => ({ date: o.date, value: o.value })),
     });
   }
 
@@ -107,21 +109,18 @@ async function fetchAllFredData(apiKey: string) {
 export default async function Home() {
   const apiKey = process.env.FRED_API_KEY;
 
-  // If no API key, show fallback
   if (!apiKey) {
     const fallback = getFallbackData();
     return <Dashboard {...fallback} />;
   }
 
   try {
-    // Fetch all data in parallel
     const [fredResult, exchangeRates, marketIndices] = await Promise.all([
       fetchAllFredData(apiKey),
       fetchExchangeRates().catch(() => []),
       fetchMarketIndices().catch(() => []),
     ]);
 
-    // Calculate liquidity score using key indicators
     const keySeriesData = new Map<string, FredObservation[]>();
     for (const id of KEY_INDICATOR_IDS) {
       const obs = fredResult.allObservations.get(id);

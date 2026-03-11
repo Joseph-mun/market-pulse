@@ -2,6 +2,8 @@
 // Indicator Metadata - merged from PPI + Liquidity dashboards
 // ============================================================
 
+import type { UpdateFrequency } from '@/lib/types';
+
 export interface IndicatorMeta {
   id: string;
   name: string;
@@ -16,6 +18,28 @@ export interface IndicatorMeta {
   krCompanyLink: string;
   isRate: boolean;
 }
+
+// Update frequency mapping
+const DAILY_IDS = new Set([
+  'DGS10', 'DGS2', 'T10Y2Y', 'T10Y3M', 'DFII10', 'SOFR',
+  'BAMLH0A0HYM2', 'BAMLC0A0CM', 'BAMLH0A3HYC', 'BAMLEMHBHYCRPIOAS', 'BAA10Y',
+  'STLFSI4', 'NFCI', 'DTWEXBGS',
+  'WALCL', 'RRPONTSYD', 'WTREGEN',
+]);
+const QUARTERLY_IDS = new Set(['M2V', 'M1V']);
+
+export function getUpdateFrequency(id: string): UpdateFrequency {
+  if (DAILY_IDS.has(id)) return 'daily';
+  if (QUARTERLY_IDS.has(id)) return 'quarterly';
+  return 'monthly';
+}
+
+export const FREQUENCY_LABELS: Record<UpdateFrequency, string> = {
+  realtime: '실시간',
+  daily: '일간',
+  monthly: '월간',
+  quarterly: '분기',
+};
 
 // --- PPI Series (32) ---
 export const PPI_INDICATORS: IndicatorMeta[] = [

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchFredSeries, computeChanges, determineSignal } from '@/lib/fred';
-import { ALL_INDICATORS } from '@/data/indicator-meta';
+import { ALL_INDICATORS, getUpdateFrequency } from '@/data/indicator-meta';
 import type { IndicatorRow } from '@/lib/types';
 
 export const revalidate = 1800; // 30 min ISR
@@ -51,6 +51,8 @@ export async function GET() {
           description: meta.description,
           interpretation: meta.interpretation,
           krInvestmentLink: meta.krCompanyLink,
+          updateFrequency: getUpdateFrequency(meta.id),
+          observations: observations.map(o => ({ date: o.date, value: o.value })),
         } satisfies IndicatorRow;
       } catch (err) {
         console.error(`Error fetching ${id}:`, err);
