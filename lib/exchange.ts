@@ -1,6 +1,6 @@
 import type { ExchangeRate } from './types';
 
-const FRANKFURTER_BASE = 'https://api.frankfurter.dev';
+const FRANKFURTER_BASE = 'https://api.frankfurter.app';
 
 interface FrankfurterResponse {
   base: string;
